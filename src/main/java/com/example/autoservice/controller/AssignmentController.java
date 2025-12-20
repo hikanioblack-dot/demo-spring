@@ -1,50 +1,47 @@
 package com.example.autoservice.controller;
 
 import com.example.autoservice.model.Assignment;
+import com.example.autoservice.repository.AssignmentRepository;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/assignments")
 public class AssignmentController {
 
-    private List<Assignment> assignments = new ArrayList<>();
-    private AtomicLong currentId = new AtomicLong(1);
+    private final AssignmentRepository repository;
 
-    @PostMapping
-    public Assignment createAssignment(@RequestBody Assignment assignment) {
-        assignment.setId(currentId.getAndIncrement());
-        assignments.add(assignment);
-        return assignment;
+    public AssignmentController(AssignmentRepository repository) {
+        this.repository = repository;
     }
 
-    @GetMapping
-    public List<Assignment> getAllAssignments() {
-        return assignments;
+    @PostMapping
+    public Assignment create(@RequestBody Assignment assignment) {
+        return repository.save(assignment);
     }
 
     @GetMapping("/{id}")
-    public Assignment getAssignmentById(@PathVariable Long id) {
-        return assignments.stream().filter(a -> a.getId().equals(id)).findFirst().orElse(null);
+    public ResponseEntity<Assignment> getById(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public Assignment updateAssignment(@PathVariable Long id, @RequestBody Assignment updatedAssignment) {
-        for (int i = 0; i < assignments.size(); i++) {
-            if (assignments.get(i).getId().equals(id)) {
-                updatedAssignment.setId(id);
-                assignments.set(i, updatedAssignment);
-                return updatedAssignment;
-            }
+    public ResponseEntity<Assignment> update(@PathVariable Long id, @RequestBody Assignment updated) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return null;
+        updated.setId(id);
+        return ResponseEntity.ok(repository.save(updated));
     }
 
     @DeleteMapping("/{id}")
-    public void deleteAssignment(@PathVariable Long id) {
-        assignments.removeIf(a -> a.getId().equals(id));
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

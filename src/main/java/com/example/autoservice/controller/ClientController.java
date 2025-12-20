@@ -1,53 +1,59 @@
 package com.example.autoservice.controller;
 
 import com.example.autoservice.model.Client;
+import com.example.autoservice.repository.ClientRepository;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/clients")
 public class ClientController {
 
-    private List<Client> clients = new ArrayList<>();
-    private AtomicLong currentId = new AtomicLong(1);
+    private final ClientRepository repository;
 
-    @PostMapping
-    public Client createClient(@RequestBody Client client) {
-        client.setId(currentId.getAndIncrement());
-        clients.add(client);
-        return client;
+    public ClientController(ClientRepository repository) {
+        this.repository = repository;
     }
 
+    // ✅ GET /clients — список всех клиентов
     @GetMapping
     public List<Client> getAllClients() {
-        return clients;
+        return repository.findAll();
     }
 
+    // GET /clients/{id} — один клиент
     @GetMapping("/{id}")
-    public Client getClientById(@PathVariable Long id) {
-        return clients.stream()
-                .filter(c -> c.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+    public ResponseEntity<Client> getById(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
+    // POST /clients — создать
+    @PostMapping
+    public Client create(@RequestBody Client client) {
+        return repository.save(client);
+    }
+
+    // PUT /clients/{id} — обновить
     @PutMapping("/{id}")
-    public Client updateClient(@PathVariable Long id, @RequestBody Client updatedClient) {
-        for (int i = 0; i < clients.size(); i++) {
-            if (clients.get(i).getId().equals(id)) {
-                updatedClient.setId(id);
-                clients.set(i, updatedClient);
-                return updatedClient;
-            }
+    public ResponseEntity<Client> update(@PathVariable Long id, @RequestBody Client updated) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return null;
+        updated.setId(id);
+        return ResponseEntity.ok(repository.save(updated));
     }
 
+    // DELETE /clients/{id} — удалить
     @DeleteMapping("/{id}")
-    public void deleteClient(@PathVariable Long id) {
-        clients.removeIf(c -> c.getId().equals(id));
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

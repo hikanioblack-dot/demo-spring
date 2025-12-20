@@ -1,50 +1,47 @@
 package com.example.autoservice.controller;
 
 import com.example.autoservice.model.Car;
+import com.example.autoservice.repository.CarRepository;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/cars")
 public class CarController {
 
-    private List<Car> cars = new ArrayList<>();
-    private AtomicLong currentId = new AtomicLong(1);
+    private final CarRepository repository;
 
-    @PostMapping
-    public Car createCar(@RequestBody Car car) {
-        car.setId(currentId.getAndIncrement());
-        cars.add(car);
-        return car;
+    public CarController(CarRepository repository) {
+        this.repository = repository;
     }
 
-    @GetMapping
-    public List<Car> getAllCars() {
-        return cars;
+    @PostMapping
+    public Car create(@RequestBody Car car) {
+        return repository.save(car);
     }
 
     @GetMapping("/{id}")
-    public Car getCarById(@PathVariable Long id) {
-        return cars.stream().filter(c -> c.getId().equals(id)).findFirst().orElse(null);
+    public ResponseEntity<Car> getById(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public Car updateCar(@PathVariable Long id, @RequestBody Car updatedCar) {
-        for (int i = 0; i < cars.size(); i++) {
-            if (cars.get(i).getId().equals(id)) {
-                updatedCar.setId(id);
-                cars.set(i, updatedCar);
-                return updatedCar;
-            }
+    public ResponseEntity<Car> update(@PathVariable Long id, @RequestBody Car updated) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return null;
+        updated.setId(id);
+        return ResponseEntity.ok(repository.save(updated));
     }
 
     @DeleteMapping("/{id}")
-    public void deleteCar(@PathVariable Long id) {
-        cars.removeIf(c -> c.getId().equals(id));
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

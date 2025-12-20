@@ -1,50 +1,47 @@
 package com.example.autoservice.controller;
 
 import com.example.autoservice.model.Mechanic;
+import com.example.autoservice.repository.MechanicRepository;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/mechanics")
 public class MechanicController {
 
-    private List<Mechanic> mechanics = new ArrayList<>();
-    private AtomicLong currentId = new AtomicLong(1);
+    private final MechanicRepository repository;
 
-    @PostMapping
-    public Mechanic createMechanic(@RequestBody Mechanic mechanic) {
-        mechanic.setId(currentId.getAndIncrement());
-        mechanics.add(mechanic);
-        return mechanic;
+    public MechanicController(MechanicRepository repository) {
+        this.repository = repository;
     }
 
-    @GetMapping
-    public List<Mechanic> getAllMechanics() {
-        return mechanics;
+    @PostMapping
+    public Mechanic create(@RequestBody Mechanic mechanic) {
+        return repository.save(mechanic);
     }
 
     @GetMapping("/{id}")
-    public Mechanic getMechanicById(@PathVariable Long id) {
-        return mechanics.stream().filter(m -> m.getId().equals(id)).findFirst().orElse(null);
+    public ResponseEntity<Mechanic> getById(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public Mechanic updateMechanic(@PathVariable Long id, @RequestBody Mechanic updatedMechanic) {
-        for (int i = 0; i < mechanics.size(); i++) {
-            if (mechanics.get(i).getId().equals(id)) {
-                updatedMechanic.setId(id);
-                mechanics.set(i, updatedMechanic);
-                return updatedMechanic;
-            }
+    public ResponseEntity<Mechanic> update(@PathVariable Long id, @RequestBody Mechanic updated) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return null;
+        updated.setId(id);
+        return ResponseEntity.ok(repository.save(updated));
     }
 
     @DeleteMapping("/{id}")
-    public void deleteMechanic(@PathVariable Long id) {
-        mechanics.removeIf(m -> m.getId().equals(id));
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

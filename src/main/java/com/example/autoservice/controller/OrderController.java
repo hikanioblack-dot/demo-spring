@@ -1,50 +1,47 @@
 package com.example.autoservice.controller;
 
 import com.example.autoservice.model.Order;
+import com.example.autoservice.repository.OrderRepository;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/orders")
 public class OrderController {
 
-    private List<Order> orders = new ArrayList<>();
-    private AtomicLong currentId = new AtomicLong(1);
+    private final OrderRepository repository;
 
-    @PostMapping
-    public Order createOrder(@RequestBody Order order) {
-        order.setId(currentId.getAndIncrement());
-        orders.add(order);
-        return order;
+    public OrderController(OrderRepository repository) {
+        this.repository = repository;
     }
 
-    @GetMapping
-    public List<Order> getAllOrders() {
-        return orders;
+    @PostMapping
+    public Order create(@RequestBody Order order) {
+        return repository.save(order);
     }
 
     @GetMapping("/{id}")
-    public Order getOrderById(@PathVariable Long id) {
-        return orders.stream().filter(o -> o.getId().equals(id)).findFirst().orElse(null);
+    public ResponseEntity<Order> getById(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public Order updateOrder(@PathVariable Long id, @RequestBody Order updatedOrder) {
-        for (int i = 0; i < orders.size(); i++) {
-            if (orders.get(i).getId().equals(id)) {
-                updatedOrder.setId(id);
-                orders.set(i, updatedOrder);
-                return updatedOrder;
-            }
+    public ResponseEntity<Order> update(@PathVariable Long id, @RequestBody Order updated) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return null;
+        updated.setId(id);
+        return ResponseEntity.ok(repository.save(updated));
     }
 
     @DeleteMapping("/{id}")
-    public void deleteOrder(@PathVariable Long id) {
-        orders.removeIf(o -> o.getId().equals(id));
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -1,11 +1,23 @@
 package com.example.autoservice.model;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "assignments")
 public class Assignment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long orderId;
-    private Long mechanicId;
+
+    @ManyToOne
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
+
+    @ManyToOne
+    @JoinColumn(name = "mechanic_id", nullable = false)
+    private Mechanic mechanic;
+
     private LocalDateTime assignedAt;
     private boolean completed;
 
@@ -14,15 +26,29 @@ public class Assignment {
         this.completed = false;
     }
 
-    // Геттеры и сеттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Long getOrderId() { return orderId; }
-    public void setOrderId(Long orderId) { this.orderId = orderId; }
+    // Для Postman
+    public Long getOrderId() {
+        return order != null ? order.getId() : null;
+    }
+    public void setOrderId(Long orderId) {
+        if (orderId != null) {
+            this.order = new Order();
+            this.order.setId(orderId);
+        }
+    }
 
-    public Long getMechanicId() { return mechanicId; }
-    public void setMechanicId(Long mechanicId) { this.mechanicId = mechanicId; }
+    public Long getMechanicId() {
+        return mechanic != null ? mechanic.getId() : null;
+    }
+    public void setMechanicId(Long mechanicId) {
+        if (mechanicId != null) {
+            this.mechanic = new Mechanic();
+            this.mechanic.setId(mechanicId);
+        }
+    }
 
     public LocalDateTime getAssignedAt() { return assignedAt; }
     public void setAssignedAt(LocalDateTime assignedAt) { this.assignedAt = assignedAt; }
