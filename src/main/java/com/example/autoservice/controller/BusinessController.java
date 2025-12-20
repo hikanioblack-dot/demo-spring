@@ -3,10 +3,6 @@ package com.example.autoservice.controller;
 import com.example.autoservice.dto.*;
 import com.example.autoservice.model.*;
 import com.example.autoservice.repository.*;
-import com.example.autoservice.dto.CreateOrderRequest;
-import com.example.autoservice.dto.AssignRequest;
-import com.example.autoservice.dto.OrderWithCar;
-import com.example.autoservice.dto.MechanicWorkload;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,63 +16,142 @@ import java.util.stream.Collectors;
 @RequestMapping("/business")
 public class BusinessController {
 
-    @Autowired private OrderRepository orderRepo;
-    @Autowired private CarRepository carRepo;
     @Autowired private ClientRepository clientRepo;
+    @Autowired private CarRepository carRepo;
+    @Autowired private OrderRepository orderRepo;
     @Autowired private MechanicRepository mechanicRepo;
     @Autowired private AssignmentRepository assignmentRepo;
 
-    @PostMapping("/orders")
+    // 1. Регистрация клиента + автомобиля
+    @PostMapping("/client-with-car")
     @Transactional
-    public Order createOrder(@RequestBody CreateOrderRequest req) {
+    public ClientWithCarResponse createClientWithCar(@RequestBody ClientWithCarRequest req) {
+        Client client = new Client();
+        client.setName(req.getClient().getName());
+        client.setPhone(req.getClient().getPhone());
+        client.setEmail(req.getClient().getEmail());
+        client = clientRepo.save(client);
+
+        Car car = new Car();
+        car.setBrand(req.getCar().getBrand());
+        car.setModel(req.getCar().getModel());
+        car.setYear(req.getCar().getYear());
+        car.setLicensePlate(req.getCar().getLicensePlate());
+        car.setClient(client);
+        car = carRepo.save(car);
+
+        ClientWithCarResponse res = new ClientWithCarResponse();
+        res.setClientId(client.getId());
+        res.setCarId(car.getId());
+        return res;
+    }
+
+    // 2. Оформить ремонт + назначить механика
+    @PostMapping("/repair-job")
+    @Transactional
+    public Order createRepairJob(@RequestBody RepairJobRequest req) {
         if (!carRepo.existsById(req.getCarId())) throw new RuntimeException("Car not found");
         if (!clientRepo.existsById(req.getClientId())) throw new RuntimeException("Client not found");
+        if (!mechanicRepo.existsById(req.getMechanicId())) throw new RuntimeException("Mechanic not found");
 
         Order order = new Order();
         order.setDescription(req.getDescription());
         order.setStatus("принято");
         order.setCarId(req.getCarId());
         order.setClientId(req.getClientId());
-        return orderRepo.save(order);
+        order = orderRepo.save(order);
+
+        Assignment assignment = new Assignment();
+        assignment.setOrder(order);
+
+        // Получаем объект Mechanic и устанавливаем его
+        Mechanic mechanic = mechanicRepo.findById(req.getMechanicId())
+                .orElseThrow(() -> new RuntimeException("Mechanic not found"));
+        assignment.setMechanic(mechanic);
+
+        assignmentRepo.save(assignment);
+        return order;
     }
 
-    @PostMapping("/assign")
+    // 3. Выдать заказ клиенту (автоматически завершает, если нужно)
+    @PostMapping("/deliver-order")
     @Transactional
-    public Assignment assign(@RequestBody AssignRequest req) {
-        if (!orderRepo.existsById(req.getOrderId())) throw new RuntimeException("Order not found");
-        if (!mechanicRepo.existsById(req.getMechanicId())) throw new RuntimeException("Mechanic not found");
+    public Order deliverOrder(@RequestBody DeliverOrderRequest req) {
+        Order order = orderRepo.findById(req.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        Assignment a = new Assignment();
-        a.setOrderId(req.getOrderId());
-        a.setMechanicId(req.getMechanicId());
-        return assignmentRepo.save(a);
-    }
+        // 🔥 Если заказ ещё не "готово" — автоматически завершаем его
+        if (!"готово".equals(order.getStatus()) && !"выдано".equals(order.getStatus())) {
+            order.setStatus("готово");
+            order.setCompletedAt(LocalDateTime.now());
+            order = orderRepo.save(order); // Сохраняем промежуточное состояние
+        }
 
-    @PostMapping("/orders/{id}/complete")
-    @Transactional
-    public Order completeOrder(@PathVariable Long id) {
-        Order order = orderRepo.findById(id).orElseThrow(() -> new RuntimeException("Order not found"));
-        order.setStatus("готово");
-        order.setCompletedAt(LocalDateTime.now());
+        // Если уже "выдано" — не делаем ничего лишнего
+        if ("выдано".equals(order.getStatus())) {
+            return order;
+        }
 
-        assignmentRepo.findByOrder_Id(id).forEach(a -> {
+        // Помечаем все назначения как выполненные
+        List<Assignment> assignments = assignmentRepo.findByOrder_Id(req.getOrderId());
+        for (Assignment a : assignments) {
             a.setCompleted(true);
             assignmentRepo.save(a);
-        });
+        }
 
+        // Меняем статус на "выдано"
+        order.setStatus("выдано");
         return orderRepo.save(order);
     }
 
-    @GetMapping("/clients/{clientId}/orders")
-    public List<OrderWithCar> getClientOrders(@PathVariable Long clientId) {
-        return orderRepo.findByClient_Id(clientId).stream()
-                .map(order -> new OrderWithCar(order, carRepo.findById(order.getCarId()).orElse(null)))
-                .collect(Collectors.toList());
+    // 4. Удалить клиента со всеми данными
+    @DeleteMapping("/client/{id}")
+    @Transactional
+    public ResponseEntity<Void> deleteClientWithAllData(@PathVariable Long id) {
+        if (!clientRepo.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        List<Car> cars = carRepo.findByClient_Id(id);
+        for (Car car : cars) {
+            List<Order> orders = orderRepo.findByCar_Id(car.getId());
+            for (Order order : orders) {
+                assignmentRepo.deleteByOrder_Id(order.getId());
+                orderRepo.deleteById(order.getId());
+            }
+            carRepo.deleteById(car.getId());
+        }
+
+        clientRepo.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/mechanics/{id}/workload")
-    public MechanicWorkload getMechanicWorkload(@PathVariable Long id) {
-        long count = assignmentRepo.countByMechanic_IdAndCompletedFalse(id);
-        return new MechanicWorkload(id, count);
+    // 5. Получить активные заказы
+    @GetMapping("/active-repairs")
+    public List<ActiveRepairDto> getActiveRepairs() {
+        return orderRepo.findByStatus("в работе").stream().map(order -> {
+            ActiveRepairDto dto = new ActiveRepairDto();
+            dto.setOrderId(order.getId());
+            dto.setDescription(order.getDescription());
+            dto.setStatus(order.getStatus());
+
+            Client client = clientRepo.findById(order.getClientId()).orElse(null);
+            dto.setClientName(client != null ? client.getName() : "Unknown");
+
+            Car car = carRepo.findById(order.getCarId()).orElse(null);
+            dto.setCarInfo(car != null ? car.getBrand() + " " + car.getModel() + " " + car.getLicensePlate() : "Unknown");
+
+            List<Assignment> assignments = assignmentRepo.findByOrder_Id(order.getId());
+            if (!assignments.isEmpty()) {
+                // 🔥 Правильно получаем ID механика через связанный объект
+                Long mechanicId = assignments.get(0).getMechanic().getId();
+                Mechanic mechanic = mechanicRepo.findById(mechanicId).orElse(null);
+                dto.setMechanicName(mechanic != null ? mechanic.getName() : "Not assigned");
+            } else {
+                dto.setMechanicName("Not assigned");
+            }
+
+            return dto;
+        }).collect(Collectors.toList());
     }
 }

@@ -5,6 +5,8 @@ import com.example.autoservice.repository.CarRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/cars")
 public class CarController {
@@ -15,11 +17,13 @@ public class CarController {
         this.repository = repository;
     }
 
-    @PostMapping
-    public Car create(@RequestBody Car car) {
-        return repository.save(car);
+    // ✅ GET /cars — получить все автомобили
+    @GetMapping
+    public List<Car> getAllCars() {
+        return repository.findAll();
     }
 
+    // GET /cars/{id} — получить один автомобиль
     @GetMapping("/{id}")
     public ResponseEntity<Car> getById(@PathVariable Long id) {
         return repository.findById(id)
@@ -27,6 +31,13 @@ public class CarController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // POST /cars — создать
+    @PostMapping
+    public Car create(@RequestBody Car car) {
+        return repository.save(car);
+    }
+
+    // PUT /cars/{id} — обновить
     @PutMapping("/{id}")
     public ResponseEntity<Car> update(@PathVariable Long id, @RequestBody Car updated) {
         if (!repository.existsById(id)) {
@@ -36,6 +47,7 @@ public class CarController {
         return ResponseEntity.ok(repository.save(updated));
     }
 
+    // DELETE /cars/{id} — удалить
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (!repository.existsById(id)) {

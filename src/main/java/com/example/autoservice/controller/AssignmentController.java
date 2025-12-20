@@ -5,6 +5,8 @@ import com.example.autoservice.repository.AssignmentRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/assignments")
 public class AssignmentController {
@@ -15,11 +17,13 @@ public class AssignmentController {
         this.repository = repository;
     }
 
-    @PostMapping
-    public Assignment create(@RequestBody Assignment assignment) {
-        return repository.save(assignment);
+    // ✅ GET /assignments — получить все назначения
+    @GetMapping
+    public List<Assignment> getAllAssignments() {
+        return repository.findAll();
     }
 
+    // GET /assignments/{id}
     @GetMapping("/{id}")
     public ResponseEntity<Assignment> getById(@PathVariable Long id) {
         return repository.findById(id)
@@ -27,6 +31,13 @@ public class AssignmentController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // POST /assignments
+    @PostMapping
+    public Assignment create(@RequestBody Assignment assignment) {
+        return repository.save(assignment);
+    }
+
+    // PUT /assignments/{id}
     @PutMapping("/{id}")
     public ResponseEntity<Assignment> update(@PathVariable Long id, @RequestBody Assignment updated) {
         if (!repository.existsById(id)) {
@@ -36,6 +47,7 @@ public class AssignmentController {
         return ResponseEntity.ok(repository.save(updated));
     }
 
+    // DELETE /assignments/{id}
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (!repository.existsById(id)) {

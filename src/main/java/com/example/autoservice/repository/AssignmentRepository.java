@@ -9,4 +9,5 @@ import java.util.List;
 public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
     List<Assignment> findByOrder_Id(Long orderId);
     long countByMechanic_IdAndCompletedFalse(Long mechanicId);
+    void deleteByOrder_Id(Long orderId);  // ← КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
 }
