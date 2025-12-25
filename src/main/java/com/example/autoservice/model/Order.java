@@ -26,7 +26,7 @@ public class Order {
         this.createdAt = LocalDateTime.now();
     }
 
-    // Геттеры и сеттеры (основные)
+    // Стандартные геттеры и сеттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getDescription() { return description; }
@@ -38,13 +38,19 @@ public class Order {
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
 
-    // Для Postman
+    public Car getCar() { return car; }
+    public void setCar(Car car) { this.car = car; }
+    public Client getClient() { return client; }
+    public void setClient(Client client) { this.client = client; }
+
+    // --- МЕТОДЫ ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ В BusinessController ---
     public Long getCarId() {
         return car != null ? car.getId() : null;
     }
+
     public void setCarId(Long carId) {
         if (carId != null) {
-            this.car = new Car();
+            if (this.car == null) this.car = new Car();
             this.car.setId(carId);
         }
     }
@@ -52,9 +58,10 @@ public class Order {
     public Long getClientId() {
         return client != null ? client.getId() : null;
     }
+
     public void setClientId(Long clientId) {
         if (clientId != null) {
-            this.client = new Client();
+            if (this.client == null) this.client = new Client();
             this.client.setId(clientId);
         }
     }
