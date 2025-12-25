@@ -1,21 +1,29 @@
 package com.example.autoservice.config;
 
+import com.example.autoservice.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
+        this.jwtFilter = jwtFilter;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -25,17 +33,24 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // ОТКЛЮЧАЕМ CSRF, чтобы работали POST/PUT запросы из Postman
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(AbstractHttpConfigurer::disable) // Отключаем CSRF для REST API
+                // 1. ПЕРЕКЛЮЧЕНИЕ В STATELESS
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
+                        // Разрешаем вход и регистрацию без токена
+                        .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
+
+                        // Защищенные пути
                         .requestMatchers(HttpMethod.DELETE, "/**").hasRole("ADMIN")
-                        .requestMatchers("/mechanics/**").hasRole("ADMIN")
-                        .requestMatchers("/auth/create-staff").hasRole("ADMIN")
+                        .requestMatchers("/mechanics/**", "/auth/create-staff").hasRole("ADMIN")
                         .requestMatchers("/business/repair-job", "/business/deliver-order").hasAnyRole("ADMIN", "MECHANIC")
+
                         .anyRequest().authenticated()
                 )
-                .httpBasic(Customizer.withDefaults());
+                // 2. ДОБАВЛЯЕМ JWT ФИЛЬТР
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
