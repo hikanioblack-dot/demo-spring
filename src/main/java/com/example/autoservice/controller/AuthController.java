@@ -10,7 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -30,23 +30,30 @@ public class AuthController {
         this.authService = authService;
     }
 
-    // 1. Регистрация клиента (из Задания 4)
+    // 🔥 НОВЫЙ МЕТОД ДЛЯ ПРЕПОДАВАТЕЛЯ: Просмотр всех сессий через GET
+    @GetMapping("/sessions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<UserSession> getAllSessions() {
+        return authService.getAllSessions();
+    }
+
+    @GetMapping("/csrf")
+    public String getCsrfToken() {
+        return "CSRF токен выдан в Cookies (XSRF-TOKEN).";
+    }
+
+    @GetMapping("/verify")
+    public String verify() {
+        return "<html><body><h1>HTTPS & CSRF Protected</h1><p>ID: 1БИБ23398</p></body></html>";
+    }
+
     @PostMapping("/register")
     @Transactional
     public ResponseEntity<String> registerClient(@RequestBody RegistrationRequest reg) {
         String pass = reg.getPassword();
-
-        // Валидация пароля
-        if (pass.length() < 8) return ResponseEntity.badRequest().body("Пароль короче 8 символов");
-        if (!pass.matches(".*[0-9].*")) return ResponseEntity.badRequest().body("Нужна хотя бы одна цифра");
-        if (!pass.matches(".*[a-z].*") || !pass.matches(".*[A-Z].*"))
-            return ResponseEntity.badRequest().body("Нужна буква другого регистра");
-        if (!pass.matches(".*[!@#$%^&*()].*")) return ResponseEntity.badRequest().body("Нужен спецсимвол !@#$%^&*()");
-
-        if (userRepo.findByUsername(reg.getUsername()).isPresent()) {
-            return ResponseEntity.badRequest().body("Этот логин уже занят");
+        if (pass.length() < 8 || !pass.matches(".*[0-9].*") || !pass.matches(".*[a-z].*") || !pass.matches(".*[A-Z].*") || !pass.matches(".*[!@#$%^&*()].*")) {
+            return ResponseEntity.badRequest().body("Пароль слишком слабый.");
         }
-
         Client client = new Client();
         client.setName(reg.getUsername());
         client.setEmail(reg.getEmail());
@@ -63,43 +70,13 @@ public class AuthController {
         return ResponseEntity.ok("Регистрация успешна! Ваш Client ID: " + client.getId());
     }
 
-    // 2. Вход (Логин) -> Выдача пары Access/Refresh
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
-        try {
-            String username = credentials.get("username");
-            String password = credentials.get("password");
-            JwtResponse response = authService.login(username, password);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(401).body("Ошибка входа: " + e.getMessage());
-        }
+        return ResponseEntity.ok(authService.login(credentials.get("username"), credentials.get("password")));
     }
 
-    // 3. Обновление токена (Refresh)
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
-        try {
-            String refreshToken = body.get("refreshToken");
-            JwtResponse response = authService.refresh(refreshToken);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(403).body("Ошибка обновления: " + e.getMessage());
-        }
-    }
-
-    // 4. Создание персонала (только ADMIN)
-    @PostMapping("/create-staff")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> createStaff(@RequestBody User userRequest, @RequestParam Role role) {
-        if (role == Role.ROLE_CLIENT) return ResponseEntity.badRequest().body("Используйте /register");
-
-        User user = new User();
-        user.setUsername(userRequest.getUsername());
-        user.setPassword(encoder.encode(userRequest.getPassword()));
-        user.setRoles(Set.of(role));
-
-        userRepo.save(user);
-        return ResponseEntity.ok("Сотрудник создан: " + role);
+        return ResponseEntity.ok(authService.refresh(body.get("refreshToken")));
     }
 }

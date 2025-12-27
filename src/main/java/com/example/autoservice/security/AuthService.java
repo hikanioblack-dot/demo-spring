@@ -78,4 +78,7 @@ public class AuthService {
         sessionRepository.save(session);
         return new JwtResponse(access, refresh);
     }
+    public List<UserSession> getAllSessions() {
+        return sessionRepository.findAll();
+    }
 }
