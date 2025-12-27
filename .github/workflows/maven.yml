@@ -23,7 +23,7 @@ jobs:
           echo "${{ secrets.SSL_KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/server_1bib23398.jks
 
       - name: Build and Package
-        run: ./mvnw clean package 
+        run: ./mvnw clean package
         env:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
