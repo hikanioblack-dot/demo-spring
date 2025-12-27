@@ -11,7 +11,9 @@ public class Order {
     private Long id;
     private String description;
     private String status;
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    // Поле, которого не хватало для BusinessController
     private LocalDateTime completedAt;
 
     @ManyToOne
@@ -22,9 +24,7 @@ public class Order {
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 
-    public Order() {
-        this.createdAt = LocalDateTime.now();
-    }
+    public Order() {}
 
     // Стандартные геттеры и сеттеры
     public Long getId() { return id; }
@@ -35,6 +35,7 @@ public class Order {
     public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
 
@@ -43,26 +44,23 @@ public class Order {
     public Client getClient() { return client; }
     public void setClient(Client client) { this.client = client; }
 
-    // --- МЕТОДЫ ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ В BusinessController ---
+    // --- Вспомогательные методы для BusinessController (исправляют ошибки компиляции) ---
+
     public Long getCarId() {
-        return car != null ? car.getId() : null;
+        return (car != null) ? car.getId() : null;
     }
 
-    public void setCarId(Long carId) {
-        if (carId != null) {
-            if (this.car == null) this.car = new Car();
-            this.car.setId(carId);
-        }
+    public void setCarId(Long id) {
+        if (this.car == null) this.car = new Car();
+        this.car.setId(id);
     }
 
     public Long getClientId() {
-        return client != null ? client.getId() : null;
+        return (client != null) ? client.getId() : null;
     }
 
-    public void setClientId(Long clientId) {
-        if (clientId != null) {
-            if (this.client == null) this.client = new Client();
-            this.client.setId(clientId);
-        }
+    public void setClientId(Long id) {
+        if (this.client == null) this.client = new Client();
+        this.client.setId(id);
     }
 }

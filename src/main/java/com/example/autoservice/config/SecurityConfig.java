@@ -33,23 +33,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable) // Отключаем CSRF для REST API
-                // 1. ПЕРЕКЛЮЧЕНИЕ В STATELESS
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Разрешаем вход и регистрацию без токена
-                        .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
-
-                        // Защищенные пути
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/clients/**", "/mechanics/**").hasAnyRole("ADMIN", "MECHANIC")
+                        .requestMatchers(HttpMethod.GET, "/cars", "/orders").hasAnyRole("ADMIN", "MECHANIC")
                         .requestMatchers(HttpMethod.DELETE, "/**").hasRole("ADMIN")
-                        .requestMatchers("/mechanics/**", "/auth/create-staff").hasRole("ADMIN")
-                        .requestMatchers("/business/repair-job", "/business/deliver-order").hasAnyRole("ADMIN", "MECHANIC")
-
                         .anyRequest().authenticated()
                 )
-                // 2. ДОБАВЛЯЕМ JWT ФИЛЬТР
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -1,7 +1,9 @@
 package com.example.autoservice.security;
 
 import com.example.autoservice.dto.JwtResponse;
-import com.example.autoservice.model.*;
+import com.example.autoservice.model.User;
+import com.example.autoservice.model.UserSession; // Правильный импорт
+import com.example.autoservice.model.SessionStatus; // Правильный импорт
 import com.example.autoservice.repository.UserRepository;
 import com.example.autoservice.repository.UserSessionRepository;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -15,13 +17,13 @@ import java.util.List;
 
 @Service
 public class AuthService {
-
     private final UserRepository userRepository;
     private final UserSessionRepository sessionRepository;
     private final JwtTokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository, UserSessionRepository sessionRepository, JwtTokenProvider tokenProvider, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, UserSessionRepository sessionRepository,
+                       JwtTokenProvider tokenProvider, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.tokenProvider = tokenProvider;
@@ -31,54 +33,49 @@ public class AuthService {
     @Transactional
     public JwtResponse login(String username, String password) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
-
+                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new BadCredentialsException("Invalid username or password");
+            throw new BadCredentialsException("Invalid credentials");
         }
-
         return createSession(user);
     }
 
     @Transactional
     public JwtResponse refresh(String refreshToken) {
         UserSession session = sessionRepository.findByRefreshToken(refreshToken)
-                .orElseThrow(() -> new RuntimeException("Refresh token not found"));
+                .orElseThrow(() -> new RuntimeException("Token not found"));
 
-        // ПРОВЕРКА REUSE DETECTION (Повторное использование)
         if (session.getStatus() != SessionStatus.ACTIVE) {
-            session.setStatus(SessionStatus.REVOKED); // Отзываем всё
+            session.setStatus(SessionStatus.REVOKED);
             sessionRepository.save(session);
-            throw new RuntimeException("Token was already used! Potential attack detected.");
+            throw new RuntimeException("Token already used!");
         }
 
         if (session.getRefreshTokenExpiry().isBefore(Instant.now())) {
-            throw new RuntimeException("Refresh token expired");
+            throw new RuntimeException("Token expired");
         }
 
-        // Помечаем как использованный
         session.setStatus(SessionStatus.USED);
         sessionRepository.save(session);
 
-        User user = userRepository.findByUsername(session.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
+        User user = userRepository.findByUsername(session.getUsername()).orElseThrow();
         return createSession(user);
     }
 
     private JwtResponse createSession(User user) {
         List<String> roles = user.getRoles().stream().map(Enum::name).toList();
-        String accessToken = tokenProvider.generateAccessToken(user.getUsername(), roles);
-        String refreshToken = tokenProvider.generateRefreshToken(user.getUsername());
+        String access = tokenProvider.generateAccessToken(user.getUsername(), roles);
+        String refresh = tokenProvider.generateRefreshToken(user.getUsername());
 
-        UserSession session = UserSession.builder()
-                .username(user.getUsername())
-                .refreshToken(refreshToken)
-                .refreshTokenExpiry(Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS))
-                .status(SessionStatus.ACTIVE)
-                .build();
+        // Создание через конструктор
+        UserSession session = new UserSession(
+                user.getUsername(),
+                refresh,
+                Instant.now().plus(7, ChronoUnit.DAYS),
+                SessionStatus.ACTIVE
+        );
 
         sessionRepository.save(session);
-        return new JwtResponse(accessToken, refreshToken);
+        return new JwtResponse(access, refresh);
     }
 }
