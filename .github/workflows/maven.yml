@@ -18,16 +18,19 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # Восстанавливаем сертификат из секрета (нужно и для сборки, и для тестов)
       - name: Decode SSL Keystore
         run: |
           echo "${{ secrets.SSL_KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/server_1bib23398.jks
 
-      - name: Build and Package
+      # Запускаем полную сборку с тестами
+      - name: Build and Test with Maven
         run: ./mvnw clean package
         env:
-          DB_URL: ${{ secrets.DB_URL }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          # Заглушки для переменных, чтобы основной application.properties не ругался при инициализации
+          DB_URL: jdbc:h2:mem:testdb
+          DB_USERNAME: sa
+          DB_PASSWORD: ""
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
