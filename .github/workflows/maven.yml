@@ -1,0 +1,36 @@
+name: Java CI with Maven and SSL (Task 6)
+
+on:
+  push:
+    branches: [ "task-6", "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Decode SSL Keystore
+        run: |
+          echo "${{ secrets.SSL_KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/server_1bib23398.jks
+
+      - name: Build and Package
+        run: ./mvnw clean package 
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoservice-v6-app
+          path: target/*.jar
