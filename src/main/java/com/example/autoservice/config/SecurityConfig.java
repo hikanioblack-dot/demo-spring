@@ -25,17 +25,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // ОТКЛЮЧАЕМ CSRF, чтобы работали POST/PUT запросы из Postman
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(AbstractHttpConfigurer::disable) // Чтобы POST/DELETE работали
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/**").hasRole("ADMIN")
-                        .requestMatchers("/mechanics/**").hasRole("ADMIN")
-                        .requestMatchers("/auth/create-staff").hasRole("ADMIN")
-                        .requestMatchers("/business/repair-job", "/business/deliver-order").hasAnyRole("ADMIN", "MECHANIC")
                         .anyRequest().authenticated()
                 )
-                .httpBasic(Customizer.withDefaults());
+                .httpBasic(Customizer.withDefaults()); // Используем Basic Auth для 4 лабы
 
         return http.build();
     }

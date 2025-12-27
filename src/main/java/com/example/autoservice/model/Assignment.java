@@ -19,6 +19,9 @@ public class Assignment {
 
     private boolean completed = false;
 
+    // Конструктор по умолчанию (обязателен для Hibernate)
+    public Assignment() {}
+
     // Геттеры и сеттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -31,4 +34,14 @@ public class Assignment {
 
     public boolean isCompleted() { return completed; }
     public void setCompleted(boolean completed) { this.completed = completed; }
+
+    // --- МЕТОДЫ ДЛЯ ПОСТМАНА (чтобы не было 500 ошибки) ---
+    public void setOrderId(Long id) {
+        if (this.order == null) this.order = new Order();
+        this.order.setId(id);
+    }
+    public void setMechanicId(Long id) {
+        if (this.mechanic == null) this.mechanic = new Mechanic();
+        this.mechanic.setId(id);
+    }
 }

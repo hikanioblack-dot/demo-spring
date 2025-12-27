@@ -2,7 +2,6 @@ package com.example.autoservice.controller;
 
 import com.example.autoservice.model.Order;
 import com.example.autoservice.repository.OrderRepository;
-import com.example.autoservice.security.SecurityUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -12,30 +11,21 @@ import java.util.List;
 @RequestMapping("/orders")
 public class OrderController {
     private final OrderRepository repository;
-    private final SecurityUtils securityUtils;
-
-    public OrderController(OrderRepository repository, SecurityUtils securityUtils) {
-        this.repository = repository;
-        this.securityUtils = securityUtils;
-    }
-
-    @GetMapping("/my")
-    public List<Order> getMyOrders() {
-        return repository.findByClient_Id(securityUtils.getCurrentUser().getClient().getId());
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Order> getById(@PathVariable Long id) {
-        return repository.findById(id).map(order -> {
-            if (!securityUtils.isStaff()) {
-                Long myId = securityUtils.getCurrentUser().getClient().getId();
-                if (!order.getClient().getId().equals(myId)) return ResponseEntity.status(403).<Order>build();
-            }
-            return ResponseEntity.ok(order);
-        }).orElse(ResponseEntity.notFound().build());
-    }
+    public OrderController(OrderRepository repository) { this.repository = repository; }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public List<Order> getAll() { return repository.findAll(); }
+
+    @PostMapping
+    public Order create(@RequestBody Order order) { return repository.save(order); }
+
+    @PutMapping("/{id}")
+    public Order update(@PathVariable Long id, @RequestBody Order updated) {
+        updated.setId(id);
+        return repository.save(updated);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public void delete(@PathVariable Long id) { repository.deleteById(id); }
 }
