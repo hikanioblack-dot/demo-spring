@@ -5,6 +5,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
@@ -13,11 +14,19 @@ import java.util.List;
 @Component
 public class JwtTokenProvider {
 
-    // Секретный ключ (минимум 32 символа)
-    private final SecretKey key = Keys.hmacShaKeyFor("super-secret-key-for-autoservice-2025-must-be-long".getBytes(StandardCharsets.UTF_8));
+    // Сюда Spring подставит значение из .env через application.properties
+    @Value("${jwt.secret}")
+    private String jwtSecret;
 
-    private final long accessExpiration = 15 * 60 * 1000; // 15 минут
-    private final long refreshExpiration = 7 * 24 * 60 * 60 * 1000; // 7 дней
+    private SecretKey key;
+
+    private final long accessExpiration = 15 * 60 * 1000;
+    private final long refreshExpiration = 7 * 24 * 60 * 60 * 1000;
+
+    @PostConstruct
+    protected void init() {
+        this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateAccessToken(String username, List<String> roles) {
         return Jwts.builder()
