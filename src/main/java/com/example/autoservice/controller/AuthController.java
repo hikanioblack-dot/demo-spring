@@ -23,43 +23,34 @@ public class AuthController {
         this.encoder = encoder;
     }
 
+    // 1. Метод для получения CSRF токена (для демонстрации)
+    @GetMapping("/csrf")
+    public String getCsrfToken() {
+        return "CSRF токен выдан в Cookies (XSRF-TOKEN).";
+    }
+
+    // 2. Регистрация обычного КЛИЕНТА (публичная)
     @PostMapping("/register")
     @Transactional
     public ResponseEntity<String> registerClient(@RequestBody RegistrationRequest reg) {
         String pass = reg.getPassword();
 
-        // 1. Валидация пароля
-        if (pass.length() < 8) {
-            return ResponseEntity.badRequest().body("Пароль короче 8 символов");
-        }
-        if (!pass.matches(".*[0-9].*")) {
-            return ResponseEntity.badRequest().body("Нужна хотя бы одна цифра");
-        }
-        // Изменили текст здесь для строчных букв
-        if (!pass.matches(".*[a-z].*")) {
-            return ResponseEntity.badRequest().body("Нужна буква другого регистра");
-        }
-        // И здесь для заглавных букв
-        if (!pass.matches(".*[A-Z].*")) {
-            return ResponseEntity.badRequest().body("Нужна буква другого регистра");
-        }
-        if (!pass.matches(".*[!@#$%^&*()].*")) {
-            return ResponseEntity.badRequest().body("Нужен спецсимвол !@#$%^&*()");
+        // Валидация пароля (Задание 4)
+        if (pass.length() < 8 || !pass.matches(".*[0-9].*") || !pass.matches(".*[a-z].*") ||
+                !pass.matches(".*[A-Z].*") || !pass.matches(".*[!@#$%^&*()].*")) {
+            return ResponseEntity.badRequest().body("Пароль слишком слабый.");
         }
 
-        // 2. Проверка уникальности
         if (userRepo.findByUsername(reg.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body("Этот логин уже занят");
         }
 
-        // 3. Создаем бизнес-профиль клиента
         Client client = new Client();
         client.setName(reg.getUsername());
         client.setEmail(reg.getEmail());
         client.setPhone(reg.getPhone());
         client = clientRepo.save(client);
 
-        // 4. Создаем системного пользователя
         User user = new User();
         user.setUsername(reg.getUsername());
         user.setPassword(encoder.encode(pass));
@@ -70,17 +61,24 @@ public class AuthController {
         return ResponseEntity.ok("Регистрация успешна! Ваш Client ID: " + client.getId());
     }
 
+    // 3. Создание ПЕРСОНАЛА (только для ADMIN) - ЭТОГО МЕТОДА НЕ ХВАТАЛО
     @PostMapping("/create-staff")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> createStaff(@RequestBody User userRequest, @RequestParam Role role) {
-        if (role == Role.ROLE_CLIENT) return ResponseEntity.badRequest().body("Используйте /register");
+    public ResponseEntity<String> createStaff(@RequestBody RegistrationRequest reg, @RequestParam Role role) {
+        if (role == Role.ROLE_CLIENT) {
+            return ResponseEntity.badRequest().body("Используйте /register для клиентов");
+        }
+
+        if (userRepo.findByUsername(reg.getUsername()).isPresent()) {
+            return ResponseEntity.badRequest().body("Пользователь уже существует");
+        }
 
         User user = new User();
-        user.setUsername(userRequest.getUsername());
-        user.setPassword(encoder.encode(userRequest.getPassword()));
+        user.setUsername(reg.getUsername());
+        user.setPassword(encoder.encode(reg.getPassword()));
         user.setRoles(Set.of(role));
 
         userRepo.save(user);
-        return ResponseEntity.ok("Сотрудник создан: " + role);
+        return ResponseEntity.ok("Сотрудник создан с ролью: " + role);
     }
 }
